@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bigdata-postgres
+    environment:
+      POSTGRES_DB: bigdata
+      POSTGRES_USER: bigdata
+      POSTGRES_PASSWORD: bigdata
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./исходные данные:/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bigdata -d bigdata"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: bigdata-clickhouse
+    environment:
+      CLICKHOUSE_DB: bigdata
+      CLICKHOUSE_USER: bigdata
+      CLICKHOUSE_PASSWORD: bigdata
+    ports:
+      - "18123:8123"
+      - "19000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  spark:
+    image: apache/spark:3.5.1
+    container_name: bigdata-spark
+    user: root
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/bigdata
+      POSTGRES_USER: bigdata
+      POSTGRES_PASSWORD: bigdata
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/bigdata
+      CLICKHOUSE_USER: bigdata
+      CLICKHOUSE_PASSWORD: bigdata
+    volumes:
+      - .:/app
+    command: ["sleep", "infinity"]
+
+volumes:
+  postgres_data:
+  clickhouse_data:
